@@ -26,52 +26,35 @@ public class BedrockStairShapePreTransformHandler implements BlockPreTransformHa
 
     @Override
     public ChunkerBlockIdentifier handle(ChunkerColumn column, Map<Edge, ChunkerColumn> neighbours, int x, int y, int z, ChunkerBlockIdentifier blockIdentifier) {
-        // Get block relative to direction
-        FacingDirectionHorizontal facingDirection = blockIdentifier.getState(VanillaBlockStates.FACING_HORIZONTAL);
-        ChunkerBlockIdentifier relative = getRelative(
-                column,
-                neighbours,
-                x,
-                y,
-                z,
-                Objects.requireNonNull(facingDirection).asDirection()
-        );
+        // Mirrors Java's StairBlock#getStairsShape: both corner checks compare the
+        // side cell against this stair, not against the neighbouring stair.
+        FacingDirectionHorizontal facingDirection = Objects.requireNonNull(blockIdentifier.getState(VanillaBlockStates.FACING_HORIZONTAL));
 
-        // Check if there is a target in the facing direction and the half value matches
-        // Based on vanilla Java logic
-        if (canConnect(blockIdentifier, relative)) {
-            // Opposite face
-            FacingDirectionHorizontal relativeFacing = relative.getState(VanillaBlockStates.FACING_HORIZONTAL);
-            Direction relativeDirection = Objects.requireNonNull(relativeFacing).asDirection();
-
-            // Fetch the relative opposite
-            ChunkerBlockIdentifier relativeOpposite = getRelative(column, neighbours, x, y, z, relativeDirection);
-            if (facingDirection.isAdjacent(relativeFacing) && canTakeShape(relative, relativeOpposite)) {
-                StairShape stairShape = relativeFacing.equals(facingDirection.rotateAntiClockwise()) ? StairShape.OUTER_LEFT : StairShape.OUTER_RIGHT;
-                return blockIdentifier.copyWith(VanillaBlockStates.STAIR_SHAPE, stairShape);
+        // A perpendicular stair in front makes an outer corner, unless this stair
+        // already continues a run on the side facing away from that stair.
+        ChunkerBlockIdentifier front = getRelative(column, neighbours, x, y, z, facingDirection.asDirection());
+        if (canConnect(blockIdentifier, front)) {
+            FacingDirectionHorizontal frontFacing = Objects.requireNonNull(front.getState(VanillaBlockStates.FACING_HORIZONTAL));
+            if (facingDirection.isAdjacent(frontFacing)) {
+                ChunkerBlockIdentifier side = getRelative(column, neighbours, x, y, z, frontFacing.asDirection().getOpposite());
+                if (canTakeShape(blockIdentifier, side)) {
+                    StairShape stairShape = frontFacing.equals(facingDirection.rotateAntiClockwise()) ? StairShape.OUTER_LEFT : StairShape.OUTER_RIGHT;
+                    return blockIdentifier.copyWith(VanillaBlockStates.STAIR_SHAPE, stairShape);
+                }
             }
         }
 
-        // Check if the block in the opposite direction can connect
-        ChunkerBlockIdentifier oppositeRelative = getRelative(
-                column,
-                neighbours,
-                x,
-                y,
-                z,
-                facingDirection.asDirection().getOpposite()
-        );
-
-        // Check if there is a target in the facing direction and the half value matches
-        if (canConnect(blockIdentifier, oppositeRelative)) {
-            FacingDirectionHorizontal relativeFacing = oppositeRelative.getState(VanillaBlockStates.FACING_HORIZONTAL);
-            Direction relativeDirectionOpposite = Objects.requireNonNull(relativeFacing).asDirection().getOpposite();
-
-            // Fetch the relative opposite
-            ChunkerBlockIdentifier relativeOpposite = getRelative(column, neighbours, x, y, z, relativeDirectionOpposite);
-            if (facingDirection.isAdjacent(relativeFacing) && canTakeShape(oppositeRelative, relativeOpposite)) {
-                StairShape stairShape = relativeFacing.equals(facingDirection.rotateAntiClockwise()) ? StairShape.INNER_LEFT : StairShape.INNER_RIGHT;
-                return blockIdentifier.copyWith(VanillaBlockStates.STAIR_SHAPE, stairShape);
+        // A perpendicular stair behind makes an inner corner, unless this stair
+        // already continues a run on the side that stair faces.
+        ChunkerBlockIdentifier back = getRelative(column, neighbours, x, y, z, facingDirection.asDirection().getOpposite());
+        if (canConnect(blockIdentifier, back)) {
+            FacingDirectionHorizontal backFacing = Objects.requireNonNull(back.getState(VanillaBlockStates.FACING_HORIZONTAL));
+            if (facingDirection.isAdjacent(backFacing)) {
+                ChunkerBlockIdentifier side = getRelative(column, neighbours, x, y, z, backFacing.asDirection());
+                if (canTakeShape(blockIdentifier, side)) {
+                    StairShape stairShape = backFacing.equals(facingDirection.rotateAntiClockwise()) ? StairShape.INNER_LEFT : StairShape.INNER_RIGHT;
+                    return blockIdentifier.copyWith(VanillaBlockStates.STAIR_SHAPE, stairShape);
+                }
             }
         }
 
